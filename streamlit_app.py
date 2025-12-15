@@ -372,13 +372,20 @@ if not os.path.exists(MODEL_PB_PATH):
             st.stop()
 
     zip_path = "model.zip"
-    if not os.path.exists(zip_path):
+    # Remove any cached zip to force re-download of the latest Drive file
+    if os.path.exists(zip_path):
         try:
-            st.info("Mengunduh model dari Google Drive...")
-            gdown.download(id=GOOGLE_DRIVE_ID, output=zip_path, quiet=False)
+            os.remove(zip_path)
         except Exception as e:
-            st.error(f"Gagal mengunduh model: {e}")
+            st.error(f"Gagal menghapus cache model.zip: {e}")
             st.stop()
+
+    try:
+        st.info("Mengunduh model dari Google Drive...")
+        gdown.download(id=GOOGLE_DRIVE_ID, output=zip_path, quiet=False)
+    except Exception as e:
+        st.error(f"Gagal mengunduh model: {e}")
+        st.stop()
 
     try:
         with zipfile.ZipFile(zip_path, "r") as zip_ref:
