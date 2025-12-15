@@ -391,64 +391,62 @@ MODEL_PB_PATH = os.path.join(MODEL_DIR, "saved_model.pb")
 # Google Drive file ID for model.zip (provided by user)
 GOOGLE_DRIVE_ID = "1Y7qZlm1RltgzOg3ZDcXLxaL-cpIjhD0D"
 
-# Ensure model is present and valid by downloading and extracting if necessary
-if not os.path.exists(MODEL_PB_PATH):
+
+def ensure_model_ready():
+    """Ensure SavedModel exists locally. Must be called inside Streamlit runtime (not at import time)."""
+    global MODEL_DIR, MODEL_PB_PATH
+
+    # Re-check marker (in case folder was extracted in a previous run)
+    if os.path.exists(MODEL_DIR_MARKER):
+        try:
+            with open(MODEL_DIR_MARKER, "r", encoding="utf-8") as f:
+                saved_dir = f.read().strip()
+            if saved_dir and os.path.exists(os.path.join(saved_dir, "saved_model.pb")):
+                MODEL_DIR = saved_dir
+        except Exception:
+            pass
+
+    MODEL_PB_PATH = os.path.join(MODEL_DIR, "saved_model.pb")
+    if os.path.exists(MODEL_PB_PATH):
+        return MODEL_DIR
+
     # If a partial/invalid folder exists from a previous run, remove it
     if os.path.isdir(MODEL_DIR):
-        try:
-            shutil.rmtree(MODEL_DIR)
-        except Exception as e:
-            st.error(f"Gagal membersihkan folder model yang tidak lengkap: {e}")
-            st.stop()
+        shutil.rmtree(MODEL_DIR, ignore_errors=True)
 
     zip_path = "model.zip"
     # Remove any cached zip to force re-download of the latest Drive file
     if os.path.exists(zip_path):
         try:
             os.remove(zip_path)
-        except Exception as e:
-            st.error(f"Gagal menghapus cache model.zip: {e}")
-            st.stop()
+        except Exception:
+            pass
 
-    try:
-        st.info("Mengunduh model dari Google Drive...")
+    with st.spinner("Mengunduh model dari Google Drive..."):
         print("[MODEL] Downloading model.zip from Google Drive...")
         gdown.download(id=GOOGLE_DRIVE_ID, output=zip_path, quiet=False)
-    except Exception as e:
-        st.error(f"Gagal mengunduh model: {e}")
-        st.stop()
 
     if not zipfile.is_zipfile(zip_path):
         try:
             file_size = os.path.getsize(zip_path)
         except Exception:
             file_size = None
-        st.error(f"File yang terunduh bukan ZIP yang valid. Ukuran file: {file_size}")
-        st.stop()
+        raise RuntimeError(f"File yang terunduh bukan ZIP yang valid. Ukuran file: {file_size}")
 
-    try:
-        with zipfile.ZipFile(zip_path, "r") as z:
-            zip_names = z.namelist()
-    except Exception as e:
-        st.error(f"Gagal membaca ZIP: {e}")
-        st.stop()
+    with zipfile.ZipFile(zip_path, "r") as z:
+        zip_names = z.namelist()
 
-    zip_has_saved_model = any(n.endswith("saved_model.pb") for n in zip_names)
-    if not zip_has_saved_model:
+    if not any(n.endswith("saved_model.pb") for n in zip_names):
         preview = "\n".join(zip_names[:30])
-        st.error(
+        raise RuntimeError(
             "ZIP berhasil diunduh, tapi tidak berisi saved_model.pb. "
             "Contoh isi ZIP (30 pertama):\n" + preview
         )
-        st.stop()
 
-    try:
+    with st.spinner("Mengekstrak model..."):
         print("[MODEL] Extracting model.zip...")
         _safe_extract_zip(zip_path, ".")
         print("[MODEL] Extraction finished.")
-    except Exception as e:
-        st.error(f"Gagal mengekstrak model: {e}")
-        st.stop()
 
     found_dir = _find_saved_model_dir(".")
     if found_dir is None:
@@ -463,11 +461,10 @@ if not os.path.exists(MODEL_PB_PATH):
             found_dir = None
 
     if found_dir is None:
-        st.error(
+        raise RuntimeError(
             "Model sudah diunduh dan diekstrak, tapi saved_model.pb masih tidak ditemukan. "
             "Pastikan ZIP berisi file saved_model.pb"
         )
-        st.stop()
 
     MODEL_DIR = found_dir
     MODEL_PB_PATH = os.path.join(MODEL_DIR, "saved_model.pb")
@@ -478,6 +475,8 @@ if not os.path.exists(MODEL_PB_PATH):
         print(f"[MODEL] Using model dir: {MODEL_DIR}")
     except Exception:
         pass
+
+    return MODEL_DIR
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # MODEL LOADING
@@ -675,6 +674,12 @@ def create_nutrition_chart(nutrisi: dict):
 def main():
     # Inject CSS
     st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+
+    try:
+        ensure_model_ready()
+    except Exception as e:
+        st.error(str(e))
+        st.stop()
     
     # ─────────────────────────────────────────────────────────────────────────
     # SIDEBAR
