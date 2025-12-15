@@ -692,7 +692,7 @@ def main():
         if uploaded_file is not None:
             image = Image.open(uploaded_file)
             st.markdown("<div class='section-header' style='margin-top:1rem;'>Preview</div>", unsafe_allow_html=True)
-            st.image(image, use_container_width=True)
+            st.image(image, use_column_width=True)
         else:
             st.markdown(
                 "<div style='text-align:center; padding:3rem 1rem; color:#64748b;'>"
