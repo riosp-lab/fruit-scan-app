@@ -396,6 +396,11 @@ def ensure_model_ready():
     """Ensure SavedModel exists locally. Must be called inside Streamlit runtime (not at import time)."""
     global MODEL_DIR, MODEL_PB_PATH
 
+    def _log(msg: str):
+        print(msg, flush=True)
+
+    t0 = time.monotonic()
+
     # Re-check marker (in case folder was extracted in a previous run)
     if os.path.exists(MODEL_DIR_MARKER):
         try:
@@ -408,6 +413,7 @@ def ensure_model_ready():
 
     MODEL_PB_PATH = os.path.join(MODEL_DIR, "saved_model.pb")
     if os.path.exists(MODEL_PB_PATH):
+        _log(f"[MODEL] SavedModel already present at {MODEL_PB_PATH}")
         return MODEL_DIR
 
     # If a partial/invalid folder exists from a previous run, remove it
@@ -423,13 +429,13 @@ def ensure_model_ready():
             pass
 
     with st.spinner("Mengunduh model dari Google Drive..."):
-        print("[MODEL] Downloading model.zip from Google Drive...")
+        _log("[MODEL] Downloading model.zip from Google Drive...")
         gdown.download(id=GOOGLE_DRIVE_ID, output=zip_path, quiet=False)
 
     try:
-        print(f"[MODEL] Download complete. File size: {os.path.getsize(zip_path)} bytes")
+        _log(f"[MODEL] Download complete in {time.monotonic() - t0:.1f}s. File size: {os.path.getsize(zip_path)} bytes")
     except Exception as e:
-        print(f"[MODEL] Could not read downloaded file size: {e}")
+        _log(f"[MODEL] Could not read downloaded file size: {e}")
 
     if not zipfile.is_zipfile(zip_path):
         try:
@@ -438,14 +444,14 @@ def ensure_model_ready():
             file_size = None
         raise RuntimeError(f"File yang terunduh bukan ZIP yang valid. Ukuran file: {file_size}")
 
-    print("[MODEL] ZIP file validation OK")
+    _log(f"[MODEL] ZIP file validation OK (+{time.monotonic() - t0:.1f}s)")
 
     with zipfile.ZipFile(zip_path, "r") as z:
         zip_names = z.namelist()
 
-    print(f"[MODEL] ZIP entries: {len(zip_names)}")
+    _log(f"[MODEL] ZIP entries: {len(zip_names)} (+{time.monotonic() - t0:.1f}s)")
     try:
-        print("[MODEL] ZIP first entries:\n" + "\n".join(zip_names[:20]))
+        _log("[MODEL] ZIP first entries:\n" + "\n".join(zip_names[:20]))
     except Exception:
         pass
 
@@ -457,15 +463,15 @@ def ensure_model_ready():
         )
 
     with st.spinner("Mengekstrak model..."):
-        print("[MODEL] Extracting model.zip...")
+        _log(f"[MODEL] Extracting model.zip... (+{time.monotonic() - t0:.1f}s)")
         _safe_extract_zip(zip_path, ".")
-        print("[MODEL] Extraction finished.")
+        _log(f"[MODEL] Extraction finished (+{time.monotonic() - t0:.1f}s)")
 
     try:
         found_after_extract = _find_saved_model_dir(".")
-        print(f"[MODEL] Found saved_model.pb dir after extract: {found_after_extract}")
+        _log(f"[MODEL] Found saved_model.pb dir after extract: {found_after_extract}")
     except Exception as e:
-        print(f"[MODEL] Error while scanning extracted files: {e}")
+        _log(f"[MODEL] Error while scanning extracted files: {e}")
 
     found_dir = _find_saved_model_dir(".")
     if found_dir is None:
@@ -491,7 +497,7 @@ def ensure_model_ready():
     try:
         with open(MODEL_DIR_MARKER, "w", encoding="utf-8") as f:
             f.write(MODEL_DIR)
-        print(f"[MODEL] Using model dir: {MODEL_DIR}")
+        _log(f"[MODEL] Using model dir: {MODEL_DIR}")
     except Exception:
         pass
 
