@@ -802,17 +802,20 @@ def main():
             
             # Loading animation
             with st.spinner("Menganalisis gambar..."):
+                status = st.empty()
+                status.info("Memuat model...")
                 model = load_model()
+
+                status.info("Menyiapkan gambar...")
                 img_batch = preprocess_image(image, target_size=(64, 64))
-                
-                # Simulate slight delay for UX
-                time.sleep(0.5)
-                
+
+                status.info("Menjalankan prediksi...")
                 preds = model(img_batch)
                 if isinstance(preds, dict):
                     preds = next(iter(preds.values()))
-                
+
                 scores = tf.nn.softmax(preds[0]).numpy()
+                status.empty()
             
             predicted_index = int(np.argmax(scores))
             confidence = float(np.max(scores) * 100.0)
