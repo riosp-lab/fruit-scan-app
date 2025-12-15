@@ -11,6 +11,7 @@ import os
 import shutil
 import zipfile
 import gdown
+import tempfile
 
 from nutrisi import CLASS_NAMES, NUTRISI_DATA
 
@@ -348,8 +349,13 @@ CUSTOM_CSS = """
 </style>
 """
 
-MODEL_DIR = "resnet50_50classes_20251210_155750"
-MODEL_DIR_MARKER = ".model_dir_path"
+MODEL_DEFAULT_DIRNAME = "resnet50_50classes_20251210_155750"
+# Store model artifacts outside the repo folder to avoid Streamlit file-watcher reruns
+MODEL_CACHE_ROOT = os.path.join(tempfile.gettempdir(), "fruit_scan_model")
+MODEL_DIR = os.path.join(MODEL_CACHE_ROOT, MODEL_DEFAULT_DIRNAME)
+MODEL_DIR_MARKER = os.path.join(MODEL_CACHE_ROOT, ".model_dir_path")
+
+os.makedirs(MODEL_CACHE_ROOT, exist_ok=True)
 
 if os.path.exists(MODEL_DIR_MARKER):
     try:
@@ -420,7 +426,7 @@ def ensure_model_ready():
     if os.path.isdir(MODEL_DIR):
         shutil.rmtree(MODEL_DIR, ignore_errors=True)
 
-    zip_path = "model.zip"
+    zip_path = os.path.join(MODEL_CACHE_ROOT, "model.zip")
     # Remove any cached zip to force re-download of the latest Drive file
     if os.path.exists(zip_path):
         try:
@@ -464,21 +470,21 @@ def ensure_model_ready():
 
     with st.spinner("Mengekstrak model..."):
         _log(f"[MODEL] Extracting model.zip... (+{time.monotonic() - t0:.1f}s)")
-        _safe_extract_zip(zip_path, ".")
+        _safe_extract_zip(zip_path, MODEL_CACHE_ROOT)
         _log(f"[MODEL] Extraction finished (+{time.monotonic() - t0:.1f}s)")
 
     try:
-        found_after_extract = _find_saved_model_dir(".")
+        found_after_extract = _find_saved_model_dir(MODEL_CACHE_ROOT)
         _log(f"[MODEL] Found saved_model.pb dir after extract: {found_after_extract}")
     except Exception as e:
         _log(f"[MODEL] Error while scanning extracted files: {e}")
 
-    found_dir = _find_saved_model_dir(".")
+    found_dir = _find_saved_model_dir(MODEL_CACHE_ROOT)
     if found_dir is None:
         try:
             pb_member = next(n for n in zip_names if n.endswith("saved_model.pb"))
             pb_dir = os.path.dirname(pb_member)
-            expected_dir = "." if pb_dir == "" else os.path.normpath(pb_dir)
+            expected_dir = MODEL_CACHE_ROOT if pb_dir == "" else os.path.join(MODEL_CACHE_ROOT, os.path.normpath(pb_dir))
             expected_pb = os.path.join(expected_dir, "saved_model.pb")
             if os.path.exists(expected_pb):
                 found_dir = expected_dir
