@@ -387,6 +387,30 @@ if not os.path.exists(MODEL_PB_PATH):
         st.error(f"Gagal mengunduh model: {e}")
         st.stop()
 
+    if not zipfile.is_zipfile(zip_path):
+        try:
+            file_size = os.path.getsize(zip_path)
+        except Exception:
+            file_size = None
+        st.error(f"File yang terunduh bukan ZIP yang valid. Ukuran file: {file_size}")
+        st.stop()
+
+    try:
+        with zipfile.ZipFile(zip_path, "r") as z:
+            zip_names = z.namelist()
+    except Exception as e:
+        st.error(f"Gagal membaca ZIP: {e}")
+        st.stop()
+
+    zip_has_saved_model = any(n.endswith("saved_model.pb") for n in zip_names)
+    if not zip_has_saved_model:
+        preview = "\n".join(zip_names[:30])
+        st.error(
+            "ZIP berhasil diunduh, tapi tidak berisi saved_model.pb. "
+            "Contoh isi ZIP (30 pertama):\n" + preview
+        )
+        st.stop()
+
     try:
         with zipfile.ZipFile(zip_path, "r") as zip_ref:
             zip_ref.extractall(".")
@@ -395,6 +419,17 @@ if not os.path.exists(MODEL_PB_PATH):
         st.stop()
 
     found_dir = _find_saved_model_dir(".")
+    if found_dir is None:
+        try:
+            pb_member = next(n for n in zip_names if n.endswith("saved_model.pb"))
+            pb_dir = os.path.dirname(pb_member)
+            expected_dir = "." if pb_dir == "" else os.path.normpath(pb_dir)
+            expected_pb = os.path.join(expected_dir, "saved_model.pb")
+            if os.path.exists(expected_pb):
+                found_dir = expected_dir
+        except Exception:
+            found_dir = None
+
     if found_dir is None:
         st.error(
             "Model sudah diunduh dan diekstrak, tapi saved_model.pb masih tidak ditemukan. "
