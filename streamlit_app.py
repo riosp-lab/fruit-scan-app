@@ -426,6 +426,11 @@ def ensure_model_ready():
         print("[MODEL] Downloading model.zip from Google Drive...")
         gdown.download(id=GOOGLE_DRIVE_ID, output=zip_path, quiet=False)
 
+    try:
+        print(f"[MODEL] Download complete. File size: {os.path.getsize(zip_path)} bytes")
+    except Exception as e:
+        print(f"[MODEL] Could not read downloaded file size: {e}")
+
     if not zipfile.is_zipfile(zip_path):
         try:
             file_size = os.path.getsize(zip_path)
@@ -433,8 +438,16 @@ def ensure_model_ready():
             file_size = None
         raise RuntimeError(f"File yang terunduh bukan ZIP yang valid. Ukuran file: {file_size}")
 
+    print("[MODEL] ZIP file validation OK")
+
     with zipfile.ZipFile(zip_path, "r") as z:
         zip_names = z.namelist()
+
+    print(f"[MODEL] ZIP entries: {len(zip_names)}")
+    try:
+        print("[MODEL] ZIP first entries:\n" + "\n".join(zip_names[:20]))
+    except Exception:
+        pass
 
     if not any(n.endswith("saved_model.pb") for n in zip_names):
         preview = "\n".join(zip_names[:30])
@@ -447,6 +460,12 @@ def ensure_model_ready():
         print("[MODEL] Extracting model.zip...")
         _safe_extract_zip(zip_path, ".")
         print("[MODEL] Extraction finished.")
+
+    try:
+        found_after_extract = _find_saved_model_dir(".")
+        print(f"[MODEL] Found saved_model.pb dir after extract: {found_after_extract}")
+    except Exception as e:
+        print(f"[MODEL] Error while scanning extracted files: {e}")
 
     found_dir = _find_saved_model_dir(".")
     if found_dir is None:
