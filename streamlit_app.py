@@ -8,6 +8,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 import time
 import os
+import shutil
 import zipfile
 import gdown
 
@@ -349,11 +350,21 @@ CUSTOM_CSS = """
 
 MODEL_DIR = "resnet50_50classes_20251210_155750"
 
+MODEL_PB_PATH = os.path.join(MODEL_DIR, "saved_model.pb")
+
 # Google Drive file ID for model.zip (provided by user)
 GOOGLE_DRIVE_ID = "1Y7qZlm1RltgzOg3ZDcXLxaL-cpIjhD0D"
 
-# Ensure model directory exists by downloading and extracting if necessary
-if not os.path.exists(MODEL_DIR):
+# Ensure model is present and valid by downloading and extracting if necessary
+if not os.path.exists(MODEL_PB_PATH):
+    # If a partial/invalid folder exists from a previous run, remove it
+    if os.path.isdir(MODEL_DIR):
+        try:
+            shutil.rmtree(MODEL_DIR)
+        except Exception as e:
+            st.error(f"Gagal membersihkan folder model yang tidak lengkap: {e}")
+            st.stop()
+
     zip_path = "model.zip"
     if not os.path.exists(zip_path):
         try:
@@ -362,12 +373,20 @@ if not os.path.exists(MODEL_DIR):
         except Exception as e:
             st.error(f"Gagal mengunduh model: {e}")
             st.stop()
+
     try:
         with zipfile.ZipFile(zip_path, "r") as zip_ref:
             zip_ref.extractall(".")
-        st.success("Model berhasil diekstrak.")
     except Exception as e:
         st.error(f"Gagal mengekstrak model: {e}")
+        st.stop()
+
+    # Validate extraction result
+    if not os.path.exists(MODEL_PB_PATH):
+        st.error(
+            "Model sudah diunduh dan diekstrak, tapi saved_model.pb masih tidak ditemukan. "
+            "Pastikan isi ZIP: resnet50_50classes_20251210_155750/saved_model.pb"
+        )
         st.stop()
 
 # ═══════════════════════════════════════════════════════════════════════════════
