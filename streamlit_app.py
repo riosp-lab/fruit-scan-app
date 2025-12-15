@@ -349,6 +349,18 @@ CUSTOM_CSS = """
 """
 
 MODEL_DIR = "resnet50_50classes_20251210_155750"
+MODEL_DIR_MARKER = ".model_dir_path"
+
+if os.path.exists(MODEL_DIR_MARKER):
+    try:
+        with open(MODEL_DIR_MARKER, "r", encoding="utf-8") as f:
+            saved_dir = f.read().strip()
+        if saved_dir:
+            saved_pb = os.path.join(saved_dir, "saved_model.pb")
+            if os.path.exists(saved_pb):
+                MODEL_DIR = saved_dir
+    except Exception:
+        pass
 
 def _find_saved_model_dir(search_root: str = "."):
     for root, _dirs, files in os.walk(search_root):
@@ -400,6 +412,7 @@ if not os.path.exists(MODEL_PB_PATH):
 
     try:
         st.info("Mengunduh model dari Google Drive...")
+        print("[MODEL] Downloading model.zip from Google Drive...")
         gdown.download(id=GOOGLE_DRIVE_ID, output=zip_path, quiet=False)
     except Exception as e:
         st.error(f"Gagal mengunduh model: {e}")
@@ -430,7 +443,9 @@ if not os.path.exists(MODEL_PB_PATH):
         st.stop()
 
     try:
+        print("[MODEL] Extracting model.zip...")
         _safe_extract_zip(zip_path, ".")
+        print("[MODEL] Extraction finished.")
     except Exception as e:
         st.error(f"Gagal mengekstrak model: {e}")
         st.stop()
@@ -456,6 +471,13 @@ if not os.path.exists(MODEL_PB_PATH):
 
     MODEL_DIR = found_dir
     MODEL_PB_PATH = os.path.join(MODEL_DIR, "saved_model.pb")
+
+    try:
+        with open(MODEL_DIR_MARKER, "w", encoding="utf-8") as f:
+            f.write(MODEL_DIR)
+        print(f"[MODEL] Using model dir: {MODEL_DIR}")
+    except Exception:
+        pass
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # MODEL LOADING
