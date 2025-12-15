@@ -356,6 +356,24 @@ def _find_saved_model_dir(search_root: str = "."):
             return root
     return None
 
+
+def _safe_extract_zip(zip_path: str, dest_dir: str = "."):
+    dest_dir_abs = os.path.abspath(dest_dir)
+    with zipfile.ZipFile(zip_path, "r") as z:
+        for info in z.infolist():
+            # Normalize path separators (some ZIPs created on Windows may use backslashes)
+            member_name = info.filename.replace("\\", "/")
+            if member_name.endswith("/"):
+                continue
+
+            target_path = os.path.abspath(os.path.join(dest_dir, member_name))
+            if not target_path.startswith(dest_dir_abs + os.sep) and target_path != dest_dir_abs:
+                raise RuntimeError("Unsafe ZIP path detected")
+
+            os.makedirs(os.path.dirname(target_path), exist_ok=True)
+            with z.open(info, "r") as src, open(target_path, "wb") as dst:
+                shutil.copyfileobj(src, dst)
+
 MODEL_PB_PATH = os.path.join(MODEL_DIR, "saved_model.pb")
 
 # Google Drive file ID for model.zip (provided by user)
@@ -412,8 +430,7 @@ if not os.path.exists(MODEL_PB_PATH):
         st.stop()
 
     try:
-        with zipfile.ZipFile(zip_path, "r") as zip_ref:
-            zip_ref.extractall(".")
+        _safe_extract_zip(zip_path, ".")
     except Exception as e:
         st.error(f"Gagal mengekstrak model: {e}")
         st.stop()
