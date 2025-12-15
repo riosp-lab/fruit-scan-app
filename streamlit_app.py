@@ -375,8 +375,10 @@ if not os.path.exists(MODEL_DIR):
 # ═══════════════════════════════════════════════════════════════════════════════
 @st.cache_resource
 def load_model():
-    layer = TFSMLayer(MODEL_DIR, call_endpoint="serve")
-    return layer
+    try:
+        return TFSMLayer(MODEL_DIR, call_endpoint="serving_default")
+    except Exception:
+        return TFSMLayer(MODEL_DIR)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -677,12 +679,14 @@ def main():
             uploaded_file = st.file_uploader(
                 "Drag & drop atau klik untuk upload",
                 type=["jpg", "jpeg", "png"],
-                label_visibility="collapsed"
+                label_visibility="collapsed",
+                key="file_input"
             )
         else:
             uploaded_file = st.camera_input(
                 "Ambil foto",
-                label_visibility="collapsed"
+                label_visibility="collapsed",
+                key="cam_input"
             )
         
         if uploaded_file is not None:
