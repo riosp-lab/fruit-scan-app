@@ -350,7 +350,7 @@ CUSTOM_CSS = """
 MODEL_DIR = "resnet50_50classes_20251210_155750"
 
 # Google Drive file ID for model.zip (provided by user)
-GOOGLE_DRIVE_ID = "1e192sF2s70PMXyTRaoXDHNXe_rGSo5_i"
+GOOGLE_DRIVE_ID = "1Y7qZlm1RltgzOg3ZDcXLxaL-cpIjhD0D"
 
 # Ensure model directory exists by downloading and extracting if necessary
 if not os.path.exists(MODEL_DIR):
