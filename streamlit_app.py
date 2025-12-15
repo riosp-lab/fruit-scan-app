@@ -350,6 +350,12 @@ CUSTOM_CSS = """
 
 MODEL_DIR = "resnet50_50classes_20251210_155750"
 
+def _find_saved_model_dir(search_root: str = "."):
+    for root, _dirs, files in os.walk(search_root):
+        if "saved_model.pb" in files:
+            return root
+    return None
+
 MODEL_PB_PATH = os.path.join(MODEL_DIR, "saved_model.pb")
 
 # Google Drive file ID for model.zip (provided by user)
@@ -381,13 +387,16 @@ if not os.path.exists(MODEL_PB_PATH):
         st.error(f"Gagal mengekstrak model: {e}")
         st.stop()
 
-    # Validate extraction result
-    if not os.path.exists(MODEL_PB_PATH):
+    found_dir = _find_saved_model_dir(".")
+    if found_dir is None:
         st.error(
             "Model sudah diunduh dan diekstrak, tapi saved_model.pb masih tidak ditemukan. "
-            "Pastikan isi ZIP: resnet50_50classes_20251210_155750/saved_model.pb"
+            "Pastikan ZIP berisi file saved_model.pb"
         )
         st.stop()
+
+    MODEL_DIR = found_dir
+    MODEL_PB_PATH = os.path.join(MODEL_DIR, "saved_model.pb")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # MODEL LOADING
