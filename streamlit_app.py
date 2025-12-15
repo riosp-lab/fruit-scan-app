@@ -719,8 +719,10 @@ def main():
         st.session_state.uploaded_image_bytes = None
     if "uploaded_image_sig" not in st.session_state:
         st.session_state.uploaded_image_sig = None
-    if "analyze_requested" not in st.session_state:
-        st.session_state.analyze_requested = False
+    if "last_prediction_sig" not in st.session_state:
+        st.session_state.last_prediction_sig = None
+    if "prediction_result" not in st.session_state:
+        st.session_state.prediction_result = None
     
     # Inject CSS
     st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
@@ -850,7 +852,8 @@ def main():
             if st.session_state.uploaded_image_sig != img_sig:
                 st.session_state.uploaded_image_bytes = img_bytes
                 st.session_state.uploaded_image_sig = img_sig
-                st.session_state.analyze_requested = False
+                st.session_state.last_prediction_sig = None  # Reset prediction untuk gambar baru
+                st.session_state.prediction_result = None
 
             image = Image.open(io.BytesIO(st.session_state.uploaded_image_bytes))
             st.markdown("<div class='section-header' style='margin-top:1rem;'>Preview</div>", unsafe_allow_html=True)
@@ -859,7 +862,8 @@ def main():
             if st.button("Hapus Gambar", use_container_width=True):
                 st.session_state.uploaded_image_bytes = None
                 st.session_state.uploaded_image_sig = None
-                st.session_state.analyze_requested = False
+                st.session_state.last_prediction_sig = None
+                st.session_state.prediction_result = None
                 st.rerun()
         else:
             st.markdown(
@@ -882,53 +886,63 @@ def main():
                 unsafe_allow_html=True
             )
 
-            btn_analyze = st.button(
-                "Analisis",
-                use_container_width=True,
-                type="primary",
-                disabled=st.session_state.analyze_requested,
-            )
-            if btn_analyze:
-                st.session_state.analyze_requested = True
+            # Cek apakah gambar baru atau sudah pernah dianalisis
+            current_sig = st.session_state.uploaded_image_sig
+            is_new_image = current_sig != st.session_state.last_prediction_sig
+            
+            # Jika gambar baru, jalankan prediksi otomatis
+            if is_new_image or st.session_state.prediction_result is None:
+                try:
+                    ensure_model_ready()
+                except Exception as e:
+                    st.error(str(e))
+                    st.markdown("</div>", unsafe_allow_html=True)
+                    st.stop()
 
-            if not st.session_state.analyze_requested:
-                st.info("Klik tombol Analisis untuk memulai prediksi.")
-                st.markdown("</div>", unsafe_allow_html=True)
-                # Stop here; don't run inference/result rendering without a prediction
-                return
-                
-            # analyze_requested is True: run inference and render all results inside this block
-            try:
-                ensure_model_ready()
-            except Exception as e:
-                st.error(str(e))
-                st.markdown("</div>", unsafe_allow_html=True)
-                st.stop()
+                image = Image.open(io.BytesIO(st.session_state.uploaded_image_bytes))
 
-            image = Image.open(io.BytesIO(st.session_state.uploaded_image_bytes))
+                # Loading animation
+                with st.spinner("Menganalisis gambar..."):
+                    status = st.empty()
+                    status.info("Memuat model...")
+                    model = load_model(MODEL_DIR)
 
-            # Loading animation
-            with st.spinner("Menganalisis gambar..."):
-                status = st.empty()
-                status.info("Memuat model...")
-                model = load_model(MODEL_DIR)
+                    status.info("Menyiapkan gambar...")
+                    img_batch = preprocess_image(image, target_size=(64, 64))
 
-                status.info("Menyiapkan gambar...")
-                img_batch = preprocess_image(image, target_size=(64, 64))
+                    status.info("Menjalankan prediksi...")
+                    preds = model(img_batch)
+                    if isinstance(preds, dict):
+                        preds = next(iter(preds.values()))
 
-                status.info("Menjalankan prediksi...")
-                preds = model(img_batch)
-                if isinstance(preds, dict):
-                    preds = next(iter(preds.values()))
+                    scores = tf.nn.softmax(preds[0]).numpy()
+                    status.empty()
 
-                scores = tf.nn.softmax(preds[0]).numpy()
-                status.empty()
+                predicted_index = int(np.argmax(scores))
+                confidence = float(np.max(scores) * 100.0)
+                predicted_name = CLASS_NAMES[predicted_index] if predicted_index < len(CLASS_NAMES) else f"Index {predicted_index}"
+                display_name = get_display_name(predicted_name)
+                fruit_emoji = get_fruit_emoji(display_name)
 
-            predicted_index = int(np.argmax(scores))
-            confidence = float(np.max(scores) * 100.0)
-            predicted_name = CLASS_NAMES[predicted_index] if predicted_index < len(CLASS_NAMES) else f"Index {predicted_index}"
-            display_name = get_display_name(predicted_name)
-            fruit_emoji = get_fruit_emoji(display_name)
+                # Simpan hasil prediksi ke session state
+                st.session_state.last_prediction_sig = current_sig
+                st.session_state.prediction_result = {
+                    'predicted_index': predicted_index,
+                    'confidence': confidence,
+                    'predicted_name': predicted_name,
+                    'display_name': display_name,
+                    'fruit_emoji': fruit_emoji,
+                    'scores': scores
+                }
+            else:
+                # Gunakan hasil prediksi yang sudah ada
+                result = st.session_state.prediction_result
+                predicted_index = result['predicted_index']
+                confidence = result['confidence']
+                predicted_name = result['predicted_name']
+                display_name = result['display_name']
+                fruit_emoji = result['fruit_emoji']
+                scores = result['scores']
 
             # Ambil warna dinamis
             color1, color2, shadow_color = get_fruit_color(display_name)
