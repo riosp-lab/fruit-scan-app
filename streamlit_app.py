@@ -847,6 +847,12 @@ def main():
             image = Image.open(io.BytesIO(st.session_state.uploaded_image_bytes))
             st.markdown("<div class='section-header' style='margin-top:1rem;'>Preview</div>", unsafe_allow_html=True)
             st.image(image, use_column_width=True)
+
+            if st.button("Hapus Gambar", use_container_width=True):
+                st.session_state.uploaded_image_bytes = None
+                st.session_state.uploaded_image_sig = None
+                st.session_state.analyze_requested = False
+                st.rerun()
         else:
             st.markdown(
                 "<div style='text-align:center; padding:3rem 1rem; color:#64748b;'>"
@@ -880,6 +886,8 @@ def main():
             if not st.session_state.analyze_requested:
                 st.info("Klik tombol Analisis untuk memulai prediksi.")
                 st.markdown("</div>", unsafe_allow_html=True)
+                # Stop here; don't run inference/result rendering without a prediction
+                
             else:
                 try:
                     ensure_model_ready()
@@ -889,119 +897,119 @@ def main():
                     st.stop()
 
                 image = Image.open(io.BytesIO(st.session_state.uploaded_image_bytes))
-            
-            # Loading animation
-            with st.spinner("Menganalisis gambar..."):
-                status = st.empty()
-                status.info("Memuat model...")
-                model = load_model(MODEL_DIR)
 
-                status.info("Menyiapkan gambar...")
-                img_batch = preprocess_image(image, target_size=(64, 64))
+                # Loading animation
+                with st.spinner("Menganalisis gambar..."):
+                    status = st.empty()
+                    status.info("Memuat model...")
+                    model = load_model(MODEL_DIR)
 
-                status.info("Menjalankan prediksi...")
-                preds = model(img_batch)
-                if isinstance(preds, dict):
-                    preds = next(iter(preds.values()))
+                    status.info("Menyiapkan gambar...")
+                    img_batch = preprocess_image(image, target_size=(64, 64))
 
-                scores = tf.nn.softmax(preds[0]).numpy()
-                status.empty()
-            
-            predicted_index = int(np.argmax(scores))
-            confidence = float(np.max(scores) * 100.0)
-            predicted_name = CLASS_NAMES[predicted_index] if predicted_index < len(CLASS_NAMES) else f"Index {predicted_index}"
-            display_name = get_display_name(predicted_name)
-            fruit_emoji = get_fruit_emoji(display_name)
-            
-            # Ambil warna dinamis
-            color1, color2, shadow_color = get_fruit_color(display_name)
-            
-            # ── Main Result ──
-            # Kita override style result-box secara inline/langsung di elemen
-            st.markdown(
-                f"""
-                <div class='result-box animate-pulse' style='background: linear-gradient(135deg, {color1} 0%, {color2} 100%); box-shadow: 0 8px 25px {shadow_color};'>
-                    <div class='result-label'>Buah Terdeteksi</div>
-                    <div class='result-value'>{fruit_emoji} {display_name}</div>
-                    <div class='result-confidence'>Confidence: {confidence:.1f}%</div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-            
-            # ── Confidence Bar ──
-            # Bar color juga mengikuti warna buah (ambil color1)
-            bar_color = color1
-            
-            st.markdown(
-                f"""
-                <div style='margin: 1rem 0;'>
-                    <div style='display:flex; justify-content:space-between; margin-bottom:0.5rem;'>
-                        <span style='font-weight:600; color:#1e293b;'>Tingkat Keyakinan</span>
-                        <span style='font-weight:700; color:{bar_color};'>{confidence:.1f}%</span>
+                    status.info("Menjalankan prediksi...")
+                    preds = model(img_batch)
+                    if isinstance(preds, dict):
+                        preds = next(iter(preds.values()))
+
+                    scores = tf.nn.softmax(preds[0]).numpy()
+                    status.empty()
+
+                predicted_index = int(np.argmax(scores))
+                confidence = float(np.max(scores) * 100.0)
+                predicted_name = CLASS_NAMES[predicted_index] if predicted_index < len(CLASS_NAMES) else f"Index {predicted_index}"
+                display_name = get_display_name(predicted_name)
+                fruit_emoji = get_fruit_emoji(display_name)
+
+                # Ambil warna dinamis
+                color1, color2, shadow_color = get_fruit_color(display_name)
+
+                # ── Main Result ──
+                # Kita override style result-box secara inline/langsung di elemen
+                st.markdown(
+                    f"""
+                    <div class='result-box animate-pulse' style='background: linear-gradient(135deg, {color1} 0%, {color2} 100%); box-shadow: 0 8px 25px {shadow_color};'>
+                        <div class='result-label'>Buah Terdeteksi</div>
+                        <div class='result-value'>{fruit_emoji} {display_name}</div>
+                        <div class='result-confidence'>Confidence: {confidence:.1f}%</div>
                     </div>
-                    <div class='confidence-bar-container'>
-                        <div class='confidence-bar' style='width:{confidence}%; background:{bar_color};'></div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+                # ── Confidence Bar ──
+                # Bar color juga mengikuti warna buah (ambil color1)
+                bar_color = color1
+                
+                st.markdown(
+                    f"""
+                    <div style='margin: 1rem 0;'>
+                        <div style='display:flex; justify-content:space-between; margin-bottom:0.5rem;'>
+                            <span style='font-weight:600; color:#1e293b;'>Tingkat Keyakinan</span>
+                            <span style='font-weight:700; color:{bar_color};'>{confidence:.1f}%</span>
+                        </div>
+                        <div class='confidence-bar-container'>
+                            <div class='confidence-bar' style='width:{confidence}%; background:{bar_color};'></div>
+                        </div>
                     </div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-            
-            st.markdown("<hr style='border:none; border-top:1px solid #e2e8f0; margin:1rem 0;'>", unsafe_allow_html=True)
-            
-            st.markdown("<div class='section-header'>Informasi Nutrisi (per 100g)</div>", unsafe_allow_html=True)
-            
-            nutrisi = NUTRISI_DATA.get(predicted_name)
-            if nutrisi is None:
-                base_name = predicted_name.split()[0]
-                nutrisi = NUTRISI_DATA.get(base_name)
-            
-            if nutrisi:
-                # Display nutrition items
-                ncol1, ncol2 = st.columns(2)
+                    """,
+                    unsafe_allow_html=True
+                )
                 
-                items = list(nutrisi.items())
-                half = len(items) // 2 + len(items) % 2
+                st.markdown("<hr style='border:none; border-top:1px solid #e2e8f0; margin:1rem 0;'>", unsafe_allow_html=True)
                 
-                with ncol1:
-                    for key, value in items[:half]:
-                        # icon = "🔥" if "Kalori" in key else "🌿" if "Serat" in key else "" if "Vitamin" in key else "📝"
-                        icon = "" # Hapus icon biar minimalis
-                        st.markdown(
-                            f"""
-                            <div class='nutrition-item'>
-                                <div class='nutrition-label'>{key}</div>
-                                <div class='nutrition-value'>{value}</div>
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
+                st.markdown("<div class='section-header'>Informasi Nutrisi (per 100g)</div>", unsafe_allow_html=True)
                 
-                with ncol2:
-                    for key, value in items[half:]:
-                        # icon = "🔥" if "Kalori" in key else "🌿" if "Serat" in key else "💊" if "Vitamin" in key else "📝"
-                        icon = "" # Hapus icon biar minimalis
-                        st.markdown(
-                            f"""
-                            <div class='nutrition-item'>
-                                <div class='nutrition-label'>{key}</div>
-                                <div class='nutrition-value'>{value}</div>
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
+                nutrisi = NUTRISI_DATA.get(predicted_name)
+                if nutrisi is None:
+                    base_name = predicted_name.split()[0]
+                    nutrisi = NUTRISI_DATA.get(base_name)
                 
+                if nutrisi:
+                    # Display nutrition items
+                    ncol1, ncol2 = st.columns(2)
+                    
+                    items = list(nutrisi.items())
+                    half = len(items) // 2 + len(items) % 2
+                    
+                    with ncol1:
+                        for key, value in items[:half]:
+                            # icon = "🔥" if "Kalori" in key else "🌿" if "Serat" in key else "" if "Vitamin" in key else "📝"
+                            icon = "" # Hapus icon biar minimalis
+                            st.markdown(
+                                f"""
+                                <div class='nutrition-item'>
+                                    <div class='nutrition-label'>{key}</div>
+                                    <div class='nutrition-value'>{value}</div>
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                            )
+                    
+                    with ncol2:
+                        for key, value in items[half:]:
+                            # icon = "🔥" if "Kalori" in key else "🌿" if "Serat" in key else "💊" if "Vitamin" in key else "📝"
+                            icon = "" # Hapus icon biar minimalis
+                            st.markdown(
+                                f"""
+                                <div class='nutrition-item'>
+                                    <div class='nutrition-label'>{key}</div>
+                                    <div class='nutrition-value'>{value}</div>
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                            )
+                    
+                    
+                    # Nutrition chart
+                    st.markdown("<div style='margin-top:1rem;'></div>", unsafe_allow_html=True)
+                    fig_nutrition = create_nutrition_chart(nutrisi)
+                    st.plotly_chart(fig_nutrition, use_container_width=True, config={'displayModeBar': False})
+                    
+                else:
+                    st.info("Data nutrisi untuk buah ini belum tersedia dalam database.")
                 
-                # Nutrition chart
-                st.markdown("<div style='margin-top:1rem;'></div>", unsafe_allow_html=True)
-                fig_nutrition = create_nutrition_chart(nutrisi)
-                st.plotly_chart(fig_nutrition, use_container_width=True, config={'displayModeBar': False})
-                
-            else:
-                st.info("Data nutrisi untuk buah ini belum tersedia dalam database.")
-            
-            st.markdown("</div>", unsafe_allow_html=True)
+                st.markdown("</div>", unsafe_allow_html=True)
             
         else:
             # Empty state
