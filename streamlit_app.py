@@ -14,14 +14,10 @@ import gdown
 import tempfile
 import io
 
-# Nonaktifkan GPU untuk menghindari error CUDA di environment tanpa GPU
-os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
-tf.config.set_visible_devices([], 'GPU')
-
 from nutrisi import CLASS_NAMES, NUTRISI_DATA
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# PAGE CONFIG
+# PAGE CONFIG - Harus dipanggil sebelum semua widget Streamlit
 # ═══════════════════════════════════════════════════════════════════════════════
 st.set_page_config(
     page_title="🍎 FruitScan AI",
@@ -708,6 +704,14 @@ def create_nutrition_chart(nutrisi: dict):
 # MAIN APPLICATION
 # ═══════════════════════════════════════════════════════════════════════════════
 def main():
+    # Nonaktifkan GPU untuk menghindari error CUDA di environment tanpa GPU
+    # Dipanggil di dalam main() setelah Streamlit siap untuk menghindari SessionInfo error
+    os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+    try:
+        tf.config.set_visible_devices([], 'GPU')
+    except Exception:
+        pass  # Ignore jika GPU tidak tersedia
+    
     # Inject CSS
     st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
     
