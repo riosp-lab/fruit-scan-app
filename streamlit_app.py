@@ -12,6 +12,7 @@ import shutil
 import zipfile
 import gdown
 import tempfile
+import io
 
 from nutrisi import CLASS_NAMES, NUTRISI_DATA
 
@@ -833,9 +834,23 @@ def main():
                 label_visibility="collapsed",
                 key="cam_input"
             )
-        
+
+        if "uploaded_image_bytes" not in st.session_state:
+            st.session_state.uploaded_image_bytes = None
+        if "uploaded_image_sig" not in st.session_state:
+            st.session_state.uploaded_image_sig = None
+        if "analyze_requested" not in st.session_state:
+            st.session_state.analyze_requested = False
+
         if uploaded_file is not None:
-            image = Image.open(uploaded_file)
+            img_bytes = uploaded_file.getvalue()
+            img_sig = (len(img_bytes),)
+            if st.session_state.uploaded_image_sig != img_sig:
+                st.session_state.uploaded_image_bytes = img_bytes
+                st.session_state.uploaded_image_sig = img_sig
+                st.session_state.analyze_requested = False
+
+            image = Image.open(io.BytesIO(st.session_state.uploaded_image_bytes))
             st.markdown("<div class='section-header' style='margin-top:1rem;'>Preview</div>", unsafe_allow_html=True)
             st.image(image, use_column_width=True)
         else:
@@ -852,11 +867,29 @@ def main():
     # RESULT SECTION
     # ─────────────────────────────────────────────────────────────────────────
     with col_result:
-        if uploaded_file is not None:
+        has_image = st.session_state.get("uploaded_image_bytes") is not None
+        if has_image:
             st.markdown(
                 "<div class='glass-card animate-fade-in'>",
                 unsafe_allow_html=True
             )
+
+            btn_analyze = st.button(
+                "Analisis",
+                use_container_width=True,
+                type="primary",
+                disabled=st.session_state.analyze_requested,
+            )
+            if btn_analyze:
+                st.session_state.analyze_requested = True
+                st.rerun()
+
+            if not st.session_state.analyze_requested:
+                st.info("Klik tombol Analisis untuk memulai prediksi.")
+                st.markdown("</div>", unsafe_allow_html=True)
+                return
+
+            image = Image.open(io.BytesIO(st.session_state.uploaded_image_bytes))
             
             # Loading animation
             with st.spinner("Menganalisis gambar..."):
