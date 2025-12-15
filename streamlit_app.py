@@ -706,11 +706,21 @@ def create_nutrition_chart(nutrisi: dict):
 def main():
     # Nonaktifkan GPU untuk menghindari error CUDA di environment tanpa GPU
     # Dipanggil di dalam main() setelah Streamlit siap untuk menghindari SessionInfo error
-    os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
     try:
+        os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
         tf.config.set_visible_devices([], 'GPU')
     except Exception:
         pass  # Ignore jika GPU tidak tersedia
+    
+    # Pastikan session state diinisialisasi dengan benar
+    if "input_mode" not in st.session_state:
+        st.session_state.input_mode = "upload"
+    if "uploaded_image_bytes" not in st.session_state:
+        st.session_state.uploaded_image_bytes = None
+    if "uploaded_image_sig" not in st.session_state:
+        st.session_state.uploaded_image_sig = None
+    if "analyze_requested" not in st.session_state:
+        st.session_state.analyze_requested = False
     
     # Inject CSS
     st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
@@ -805,9 +815,6 @@ def main():
         # Gunakan columns untuk tombol pilihan
         btn_col1, btn_col2 = st.columns(2)
         
-        if "input_mode" not in st.session_state:
-            st.session_state.input_mode = "upload"
-        
         with btn_col1:
             if st.button("Upload File", use_container_width=True, 
                         type="primary" if st.session_state.input_mode == "upload" else "secondary"):
@@ -836,13 +843,6 @@ def main():
                 label_visibility="collapsed",
                 key="cam_input"
             )
-
-        if "uploaded_image_bytes" not in st.session_state:
-            st.session_state.uploaded_image_bytes = None
-        if "uploaded_image_sig" not in st.session_state:
-            st.session_state.uploaded_image_sig = None
-        if "analyze_requested" not in st.session_state:
-            st.session_state.analyze_requested = False
 
         if uploaded_file is not None:
             img_bytes = uploaded_file.getvalue()
