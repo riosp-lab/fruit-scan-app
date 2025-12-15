@@ -461,11 +461,11 @@ if not os.path.exists(MODEL_PB_PATH):
 # MODEL LOADING
 # ═══════════════════════════════════════════════════════════════════════════════
 @st.cache_resource
-def load_model():
+def load_model(model_dir: str):
     try:
-        return TFSMLayer(MODEL_DIR, call_endpoint="serving_default")
+        return TFSMLayer(model_dir, call_endpoint="serving_default")
     except Exception:
-        return TFSMLayer(MODEL_DIR)
+        return TFSMLayer(model_dir)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -804,7 +804,7 @@ def main():
             with st.spinner("Menganalisis gambar..."):
                 status = st.empty()
                 status.info("Memuat model...")
-                model = load_model()
+                model = load_model(MODEL_DIR)
 
                 status.info("Menyiapkan gambar...")
                 img_batch = preprocess_image(image, target_size=(64, 64))
