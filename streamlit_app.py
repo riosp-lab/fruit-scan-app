@@ -706,12 +706,6 @@ def create_nutrition_chart(nutrisi: dict):
 def main():
     # Inject CSS
     st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
-
-    try:
-        ensure_model_ready()
-    except Exception as e:
-        st.error(str(e))
-        st.stop()
     
     # ─────────────────────────────────────────────────────────────────────────
     # SIDEBAR
@@ -882,14 +876,19 @@ def main():
             )
             if btn_analyze:
                 st.session_state.analyze_requested = True
-                st.rerun()
 
             if not st.session_state.analyze_requested:
                 st.info("Klik tombol Analisis untuk memulai prediksi.")
                 st.markdown("</div>", unsafe_allow_html=True)
-                return
+            else:
+                try:
+                    ensure_model_ready()
+                except Exception as e:
+                    st.error(str(e))
+                    st.markdown("</div>", unsafe_allow_html=True)
+                    st.stop()
 
-            image = Image.open(io.BytesIO(st.session_state.uploaded_image_bytes))
+                image = Image.open(io.BytesIO(st.session_state.uploaded_image_bytes))
             
             # Loading animation
             with st.spinner("Menganalisis gambar..."):
